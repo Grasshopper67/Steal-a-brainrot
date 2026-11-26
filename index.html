@@ -75,7 +75,7 @@
   Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> &nbsp;|&nbsp; Look: Click & Drag Mouse &nbsp;|&nbsp; Buy/Steal/Slap: <kbd>SPACE</kbd> or <kbd>E</kbd>
 </div>
 
-<!-- Updated to Three.js r136 to support CapsuleGeometry -->
+<!-- Three.js r136 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r136/three.min.js"></script>
 
 <script>
@@ -135,7 +135,6 @@ function createBaseVisual(base, colorHex, label) {
   mesh.position.set(base.x, 0.1, base.z);
   group.add(mesh);
 
-  // Pedestal slots (6 per base)
   for (let r = -1; r <= 1; r++) {
     for (let c = -0.5; c <= 0.5; c += 1) {
       const slotX = base.x + c * 3.5;
@@ -155,22 +154,22 @@ function createBaseVisual(base, colorHex, label) {
 createBaseVisual(playerBase, 0x3b82f6, "Your Base");
 createBaseVisual(rivalBase, 0xef4444, "Rival Base");
 
-// Game Entities
+// Game Entities (Added player.y to fix camera bug)
 let player = {
-  x: -18, z: 8, radius: 1.2, speed: 0.12,
+  x: -18, y: 1.2, z: 8, radius: 1.2, speed: 0.12,
   cash: 50, carrying: null
 };
 
 let bot = {
-  x: 18, z: -8, radius: 1.2, speed: 0.08,
+  x: 18, y: 1.2, z: -8, radius: 1.2, speed: 0.08,
   cash: 50, carrying: null, mesh: null, stunTimer: 0
 };
 
-// Create Bot Mesh using CapsuleGeometry
+// Create Bot Mesh
 const botGeo = new THREE.CapsuleGeometry(0.8, 1.5, 4, 8);
 const botMat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
 bot.mesh = new THREE.Mesh(botGeo, botMat);
-bot.mesh.position.set(bot.x, 1.5, bot.z);
+bot.mesh.position.set(bot.x, bot.y, bot.z);
 scene.add(bot.mesh);
 
 // Conveyor Items Collection
@@ -320,7 +319,7 @@ function updateBot() {
     bot.x += (dx / dist) * bot.speed;
     bot.z += (dz / dist) * bot.speed;
   }
-  bot.mesh.position.set(bot.x, 1.2, bot.z);
+  bot.mesh.position.set(bot.x, bot.y, bot.z);
 
   if (bot.carrying && Math.hypot(bot.x - rivalBase.x, bot.z - rivalBase.z) < 3.5) {
     const slot = getEmptySlot(rivalBase);
@@ -391,7 +390,7 @@ function animate() {
   }
 
   if (player.carrying) {
-    player.carrying.mesh.position.set(player.x, 3.2, player.z);
+    player.carrying.mesh.position.set(player.x, player.y + 2.0, player.z);
     player.carrying.mesh.rotation.y += 0.03;
   }
 
@@ -401,7 +400,7 @@ function animate() {
   camera.position.x = player.x + Math.sin(cameraYaw) * Math.cos(cameraPitch) * camDist;
   camera.position.y = Math.sin(cameraPitch) * camDist + 1;
   camera.position.z = player.z + Math.cos(cameraYaw) * Math.cos(cameraPitch) * camDist;
-  camera.lookAt(player.x, player.y + 1.2, player.z);
+  camera.lookAt(player.x, player.y, player.z);
 
   document.getElementById('player-cash').textContent = `$${player.cash}`;
   document.getElementById('player-income').textContent = `(+$${getIncome(playerBase)}/s)`;
