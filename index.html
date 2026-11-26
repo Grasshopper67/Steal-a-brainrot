@@ -3,56 +3,80 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Steal a Brainrot - Click to Move Edition</title>
+<title>Steal a Brainrot - Roblox Tycoon Style</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-  body { background-color: #0d0d12; color: #fff; overflow: hidden; user-select: none; }
+  body { background-color: #08080c; color: #fff; overflow: hidden; user-select: none; }
+  
   #ui-bar {
     position: absolute;
     top: 15px;
     left: 50%;
     transform: translateX(-50%);
-    width: 800px;
+    width: 850px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(30, 30, 42, 0.85);
-    backdrop-filter: blur(8px);
-    padding: 12px 25px;
-    border-radius: 12px;
-    border: 2px solid rgba(255,255,255,0.1);
+    background: rgba(20, 20, 32, 0.9);
+    backdrop-filter: blur(10px);
+    padding: 14px 25px;
+    border-radius: 16px;
+    border: 2px solid rgba(192, 132, 252, 0.3);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
     z-index: 10;
   }
-  .stat { font-size: 18px; font-weight: bold; }
+  .stat { font-size: 20px; font-weight: 900; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
   .money { color: #4ade80; }
-  .income { color: #facc15; font-size: 13px; }
+  .income { color: #facc15; font-size: 13px; font-weight: 600; display: block; }
   .rival-money { color: #f87171; }
-  #crosshair {
+  .title {
+    font-weight: 900;
+    letter-spacing: 2px;
+    font-size: 22px;
+    background: linear-gradient(135deg, #c084fc, #38bdf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 4px 15px rgba(192, 132, 252, 0.4);
+  }
+
+  #shop-panel {
     position: absolute;
-    top: 50%;
+    top: 90px;
     left: 50%;
-    transform: translate(-50%, -50%);
-    width: 8px;
-    height: 8px;
-    background-color: rgba(255,255,255,0.7);
-    border-radius: 50%;
-    pointer-events: none;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 15px;
     z-index: 10;
   }
+  .shop-btn {
+    background: linear-gradient(135deg, #1e1e2f, #2d2d44);
+    border: 2px solid #52527a;
+    color: #fff;
+    padding: 8px 18px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 800;
+    font-size: 13px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    transition: all 0.2s;
+  }
+  .shop-btn:hover { border-color: #c084fc; transform: translateY(-2px); box-shadow: 0 6px 16px rgba(192,132,252,0.3); }
+
   #controls-hint {
     position: absolute;
     bottom: 15px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0,0,0,0.6);
-    padding: 8px 16px;
-    border-radius: 8px;
+    background: rgba(10, 10, 15, 0.75);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 8px 18px;
+    border-radius: 10px;
     color: #9ca3af;
     font-size: 13px;
     z-index: 10;
     pointer-events: none;
   }
-  kbd { background: #2d2d3f; padding: 2px 6px; border-radius: 4px; border: 1px solid #4b4b66; color: #fff; }
+  kbd { background: #232333; padding: 2px 7px; border-radius: 5px; border: 1px solid #48486a; color: #fff; font-weight: bold; }
 </style>
 </head>
 <body>
@@ -60,90 +84,107 @@
 <div id="ui-bar">
   <div>
     <span class="stat money" id="player-cash">$50</span>
-    <span class="income" id="player-income">(+$0/s)</span>
+    <span class="income" id="player-income">+ $0/s</span>
   </div>
-  <div style="font-weight: 800; letter-spacing: 1px; color: #c084fc;">STEAL A BRAINROT 3D</div>
+  <div class="title">STEAL A BRAINROT</div>
   <div>
     <span class="stat rival-money" id="rival-cash">Bot: $50</span>
-    <span class="income" id="rival-income">(+$0/s)</span>
+    <span class="income" id="rival-income">+ $0/s</span>
   </div>
 </div>
 
-<div id="crosshair"></div>
+<div id="shop-panel">
+  <button class="shop-btn" onclick="buySpeedCoil()">⚡ Speed Coil ($300)</button>
+  <button class="shop-btn" onclick="buyBaseShield()">🛡️ Base Shield ($500)</button>
+  <button class="shop-btn" onclick="buyRebirth()">✨ Rebirth (2x Income, $2000)</button>
+</div>
 
 <div id="controls-hint">
-  Move: <kbd>Left Click on Ground</kbd> &nbsp;|&nbsp; Buy/Steal/Slap: <kbd>SPACE</kbd> or <kbd>E</kbd>
+  Move: <kbd>Left Click on Ground</kbd> &nbsp;|&nbsp; Buy / Steal / Slap: <kbd>SPACE</kbd> or <kbd>E</kbd>
 </div>
 
 <!-- Load Three.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
 <script>
-// Brainrot Tiers
+// Brainrot Tycoon Tiers (Roblox Meme Style)
 const BRAINROT_TYPES = [
-  { name: "Skibidi", cost: 25, income: 3, color: 0x94a3b8, shape: "box" },
-  { name: "Rizzler", cost: 75, income: 10, color: 0x38bdf8, shape: "sphere" },
-  { name: "Sigma", cost: 200, income: 30, color: 0xa855f7, shape: "cylinder" },
-  { name: "Grimace", cost: 500, income: 80, color: 0xec4899, shape: "cone" },
-  { name: "GigaChad", cost: 1200, income: 220, color: 0xf59e0b, shape: "doodad" }
+  { name: "Skibidi", cost: 25, income: 3, color: 0x94a3b8, emoji: "🚽" },
+  { name: "Rizzler", cost: 75, income: 10, color: 0x38bdf8, emoji: "😎" },
+  { name: "Sigma", cost: 200, income: 30, color: 0xa855f7, emoji: "🗿" },
+  { name: "Grimace", cost: 500, income: 80, color: 0xec4899, emoji: "🥤" },
+  { name: "GigaChad", cost: 1200, income: 220, color: 0xf59e0b, emoji: "💪" }
 ];
 
 // Scene Setup
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x121218);
-scene.fog = new THREE.FogExp2(0x121218, 0.015);
+scene.background = new THREE.Color(0x0a0a0f);
+scene.fog = new THREE.FogExp2(0x0a0a0f, 0.012);
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-// Lighting
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+// Lighting for Tycoon Polish
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
 scene.add(ambientLight);
 
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-dirLight.position.set(10, 20, 10);
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+dirLight.position.set(20, 35, 20);
 dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 2048;
+dirLight.shadow.mapSize.height = 2048;
 scene.add(dirLight);
 
-// Arena Ground
-const floorGeo = new THREE.PlaneGeometry(60, 40);
-const floorMat = new THREE.MeshStandardMaterial({ color: 0x1e1e2d, roughness: 0.8 });
+// Neon Grid Arena Floor
+const floorGeo = new THREE.PlaneGeometry(64, 44);
+const floorMat = new THREE.MeshStandardMaterial({ color: 0x13131c, roughness: 0.9, metalness: 0.1 });
 const floor = new THREE.Mesh(floorGeo, floorMat);
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
 
-// Center Conveyor Belt
-const convGeo = new THREE.BoxGeometry(6, 0.1, 40);
-const convMat = new THREE.MeshStandardMaterial({ color: 0x272738 });
+// Center Industrial Conveyor Belt with Neon Glow Borders
+const convGeo = new THREE.BoxGeometry(5.8, 0.15, 44);
+const convMat = new THREE.MeshStandardMaterial({ color: 0x1b1b26, roughness: 0.5 });
 const conveyor = new THREE.Mesh(convGeo, convMat);
 conveyor.position.set(0, 0.05, 0);
 scene.add(conveyor);
 
-// Bases Definition
-const playerBase = { x: -18, z: 0, w: 10, h: 14, slots: [] };
-const rivalBase = { x: 18, z: 0, w: 10, h: 14, slots: [] };
+const lineGeo = new THREE.BoxGeometry(0.15, 0.2, 44);
+const lineMat = new THREE.MeshBasicMaterial({ color: 0xc084fc });
+const leftLine = new THREE.Mesh(lineGeo, lineMat); leftLine.position.set(-2.9, 0.1, 0);
+const rightLine = new THREE.Mesh(lineGeo, lineMat); rightLine.position.set(2.9, 0.1, 0);
+scene.add(leftLine);
+scene.add(rightLine);
 
-function createBaseVisual(base, colorHex) {
+// Bases Definition (Blue Player Base vs Red Rival Base)
+const playerBase = { x: -20, z: 0, w: 10, h: 14, slots: [], shield: false };
+const rivalBase = { x: 20, z: 0, w: 10, h: 14, slots: [], shield: false };
+
+function createBaseVisual(base, colorHex, glowColor) {
   const group = new THREE.Group();
-  const baseGeo = new THREE.BoxGeometry(base.w, 0.2, base.h);
-  const baseMat = new THREE.MeshStandardMaterial({ color: colorHex, transparent: true, opacity: 0.3 });
+  
+  // Neon Base Platform
+  const baseGeo = new THREE.BoxGeometry(base.w, 0.25, base.h);
+  const baseMat = new THREE.MeshStandardMaterial({ color: colorHex, transparent: true, opacity: 0.35, roughness: 0.2 });
   const mesh = new THREE.Mesh(baseGeo, baseMat);
-  mesh.position.set(base.x, 0.1, base.z);
+  mesh.position.set(base.x, 0.12, base.z);
   group.add(mesh);
 
+  // Pedestals
   for (let r = -1; r <= 1; r++) {
     for (let c = -0.5; c <= 0.5; c += 1) {
-      const slotX = base.x + c * 3.5;
-      const slotZ = base.z + r * 3.5;
+      const slotX = base.x + c * 3.6;
+      const slotZ = base.z + r * 3.8;
       
-      const pedGeo = new THREE.CylinderGeometry(1.2, 1.4, 0.4, 16);
-      const pedMat = new THREE.MeshStandardMaterial({ color: 0x33334d });
+      const pedGeo = new THREE.CylinderGeometry(1.3, 1.5, 0.45, 24);
+      const pedMat = new THREE.MeshStandardMaterial({ color: 0x1f1f2e, metalness: 0.3, roughness: 0.4 });
       const ped = new THREE.Mesh(pedGeo, pedMat);
-      ped.position.set(slotX, 0.3, slotZ);
+      ped.position.set(slotX, 0.35, slotZ);
       group.add(ped);
 
       base.slots.push({ x: slotX, z: slotZ, item: null, mesh: null });
@@ -154,44 +195,105 @@ function createBaseVisual(base, colorHex) {
 createBaseVisual(playerBase, 0x3b82f6);
 createBaseVisual(rivalBase, 0xef4444);
 
-// Game Entities with Click-to-Move Targets
+// Helper: Create 3D Floating Emoji Icon Texture for Meme Brainrots
+function createBrainrotMesh(type) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  
+  // Card Background
+  ctx.fillStyle = "#181824";
+  ctx.roundRect ? ctx.roundRect(10, 10, 236, 236, 30) : ctx.fillRect(10, 10, 236, 236);
+  ctx.fillStyle = type.color;
+  ctx.globalAlpha = 0.25;
+  ctx.fill();
+  ctx.globalAlpha = 1.0;
+
+  // Border
+  ctx.strokeStyle = type.color;
+  ctx.lineWidth = 10;
+  ctx.stroke();
+
+  // Emoji
+  ctx.font = "100px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(type.emoji, 128, 100);
+
+  // Name Label
+  ctx.font = "bold 26px sans-serif";
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(type.name, 128, 200);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const geo = new THREE.BoxGeometry(1.8, 1.8, 0.4);
+  const mat = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.3 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
+  return mesh;
+}
+
+// Game Entities
 let player = {
-  x: -18, y: 1.2, z: 8, targetX: -18, targetZ: 8, speed: 0.15,
-  cash: 50, carrying: null
+  x: -20, y: 1.2, z: 8, targetX: -20, targetZ: 8, speed: 0.16,
+  cash: 50, carrying: null, rebirthMultiplier: 1
 };
 
 let bot = {
-  x: 18, y: 1.2, z: -8, speed: 0.08,
+  x: 20, y: 1.2, z: -8, speed: 0.08,
   cash: 50, carrying: null, mesh: null, stunTimer: 0
 };
 
-// Create Player Character Mesh (Friendly capsule avatar)
+// Player Avatar (Roblox Style Capsule Blocky Character)
 const playerGroup = new THREE.Group();
-const playerBodyGeo = new THREE.CylinderGeometry(0.8, 0.8, 2, 16);
-const playerMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
+const playerBodyGeo = new THREE.BoxGeometry(1.2, 2, 0.8);
+const playerMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.3 });
 const playerMesh = new THREE.Mesh(playerBodyGeo, playerMat);
 playerMesh.position.y = 1;
+playerMesh.castShadow = true;
 playerGroup.add(playerMesh);
 playerGroup.position.set(player.x, 0, player.z);
 scene.add(playerGroup);
 
-// Create Bot Character Mesh
+// Rival Bot Avatar
 const botGroup = new THREE.Group();
-const botBodyGeo = new THREE.CylinderGeometry(0.8, 0.8, 2, 16);
-const botMat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
+const botBodyGeo = new THREE.BoxGeometry(1.2, 2, 0.8);
+const botMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3 });
 const botMesh = new THREE.Mesh(botBodyGeo, botMat);
 botMesh.position.y = 1;
+botMesh.castShadow = true;
 botGroup.add(botMesh);
 botGroup.position.set(bot.x, 0, bot.z);
 scene.add(botGroup);
 bot.mesh = botGroup;
 
-// Conveyor Items Collection
+// Conveyor Items & Timers
 let conveyorItems = [];
 let spawnTimer = 0;
 let incomeTimer = 0;
 
-// Raycaster for Click-to-Move
+// Shop Purchases
+function buySpeedCoil() {
+  if (player.cash >= 300) {
+    player.cash -= 300;
+    player.speed = 0.24;
+  }
+}
+function buyBaseShield() {
+  if (player.cash >= 500) {
+    player.cash -= 500;
+    playerBase.shield = true;
+  }
+}
+function buyRebirth() {
+  if (player.cash >= 2000) {
+    player.cash -= 2000;
+    player.rebirthMultiplier *= 2;
+  }
+}
+
+// Click-to-Move Raycasting
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
@@ -219,27 +321,15 @@ function getEmptySlot(base) {
 }
 
 function getIncome(base) {
-  return base.slots.reduce((sum, s) => sum + (s.item ? s.item.type.income : 0), 0);
+  const baseInc = base.slots.reduce((sum, s) => sum + (s.item ? s.item.type.income : 0), 0);
+  return base === playerBase ? baseInc * player.rebirthMultiplier : baseInc;
 }
 
-// Create 3D Brainrot Object
-function createBrainrotMesh(type) {
-  let geo;
-  if (type.shape === "sphere") geo = new THREE.SphereGeometry(1.1, 16, 16);
-  else if (type.shape === "cylinder") geo = new THREE.CylinderGeometry(0.9, 0.9, 1.8, 16);
-  else if (type.shape === "cone") geo = new THREE.ConeGeometry(1.1, 2, 16);
-  else if (type.shape === "doodad") geo = new THREE.TorusGeometry(0.9, 0.4, 16, 32);
-  else geo = new THREE.BoxGeometry(1.8, 1.8, 1.8);
-
-  const mat = new THREE.MeshStandardMaterial({ color: type.color, roughness: 0.3 });
-  return new THREE.Mesh(geo, mat);
-}
-
-// Action Trigger (Buy, Steal, Slap)
+// Core Gameplay Actions: Slap, Buy, Steal
 function handleAction() {
   const distToBot = Math.hypot(player.x - bot.x, player.z - bot.z);
   if (distToBot < 3.5) {
-    bot.stunTimer = 120;
+    bot.stunTimer = 140;
     if (bot.carrying) {
       scene.remove(bot.carrying.mesh);
       bot.carrying = null;
@@ -249,6 +339,7 @@ function handleAction() {
 
   if (player.carrying) return;
 
+  // Buy from Conveyor Belt
   for (let i = conveyorItems.length - 1; i >= 0; i--) {
     const item = conveyorItems[i];
     const dist = Math.hypot(player.x - item.mesh.position.x, player.z - item.mesh.position.z);
@@ -267,6 +358,8 @@ function handleAction() {
     }
   }
 
+  // Steal from Rival Base (unless protected by shield)
+  if (rivalBase.shield) return;
   for (let slot of rivalBase.slots) {
     if (slot.item && Math.hypot(player.x - slot.x, player.z - slot.z) < 2.5) {
       const pSlot = getEmptySlot(playerBase);
@@ -327,36 +420,36 @@ function updateBot() {
     const slot = getEmptySlot(rivalBase);
     if (slot) {
       slot.item = bot.carrying;
-      slot.item.mesh.position.set(slot.x, 1.2, slot.z);
+      slot.item.mesh.position.set(slot.x, 1.3, slot.z);
       scene.add(slot.item.mesh);
       bot.carrying = null;
     }
   }
 }
 
-// Main Loop
+// Main Game Loop
 function animate() {
   requestAnimationFrame(animate);
 
-  // Spawn Conveyor Items
+  // Spawn Meme Brainrots on Conveyor
   spawnTimer++;
-  if (spawnTimer >= 120) {
+  if (spawnTimer >= 110) {
     spawnTimer = 0;
     const rand = Math.random();
-    let tier = rand > 0.9 ? 4 : (rand > 0.7 ? 3 : (rand > 0.4 ? 2 : (rand > 0.2 ? 1 : 0)));
+    let tier = rand > 0.92 ? 4 : (rand > 0.78 ? 3 : (rand > 0.5 ? 2 : (rand > 0.25 ? 1 : 0)));
     const type = BRAINROT_TYPES[tier];
     
     const mesh = createBrainrotMesh(type);
-    mesh.position.set(0, 1.2, -18);
+    mesh.position.set(0, 1.2, -20);
     scene.add(mesh);
     conveyorItems.push({ type, mesh });
   }
 
-  // Move Conveyor Items
+  // Move Conveyor Items Forward
   for (let i = conveyorItems.length - 1; i >= 0; i--) {
-    conveyorItems[i].mesh.position.z += 0.06;
-    conveyorItems[i].mesh.rotation.y += 0.02;
-    if (conveyorItems[i].mesh.position.z > 18) {
+    conveyorItems[i].mesh.position.z += 0.07;
+    conveyorItems[i].mesh.rotation.y += 0.025;
+    if (conveyorItems[i].mesh.position.z > 20) {
       scene.remove(conveyorItems[i].mesh);
       conveyorItems.splice(i, 1);
     }
@@ -370,7 +463,7 @@ function animate() {
     bot.cash += getIncome(rivalBase);
   }
 
-  // Click-to-Move Player Interpolation
+  // Smooth Player Movement
   const pdx = player.targetX - player.x;
   const pdz = player.targetZ - player.z;
   const pDist = Math.hypot(pdx, pdz);
@@ -378,39 +471,40 @@ function animate() {
     player.x += (pdx / pDist) * player.speed;
     player.z += (pdz / pDist) * player.speed;
   }
-  player.x = Math.max(-28, Math.min(28, player.x));
-  player.z = Math.max(-18, Math.min(18, player.z));
+  player.x = Math.max(-30, Math.min(30, player.x));
+  player.z = Math.max(-20, Math.min(20, player.z));
   playerGroup.position.set(player.x, 0, player.z);
 
-  // Player Deposit Check
+  // Player Deposit into Base
   if (player.carrying && Math.hypot(player.x - playerBase.x, player.z - playerBase.z) < 4) {
     const slot = getEmptySlot(playerBase);
     if (slot) {
       slot.item = player.carrying;
-      slot.item.mesh.position.set(slot.x, 1.2, slot.z);
+      slot.item.mesh.position.set(slot.x, 1.3, slot.z);
       scene.add(slot.item.mesh);
       player.carrying = null;
     }
   }
 
+  // Float carried item above player's head
   if (player.carrying) {
-    player.carrying.mesh.position.set(player.x, player.y + 2.2, player.z);
+    player.carrying.mesh.position.set(player.x, player.y + 2.5, player.z);
     player.carrying.mesh.rotation.y += 0.04;
   }
 
   updateBot();
 
-  // Smooth Top-Down Isometric Camera Following Player
+  // Smooth Isometric Camera Tracking
   camera.position.x = player.x;
-  camera.position.y = 18;
+  camera.position.y = 19;
   camera.position.z = player.z + 14;
   camera.lookAt(player.x, 0, player.z);
 
-  // Update UI Elements
+  // Update UI Stats
   document.getElementById('player-cash').textContent = `$${player.cash}`;
-  document.getElementById('player-income').textContent = `(+$${getIncome(playerBase)}/s)`;
+  document.getElementById('player-income').textContent = `+ $${getIncome(playerBase)}/s`;
   document.getElementById('rival-cash').textContent = `Bot: $${bot.cash}`;
-  document.getElementById('rival-income').textContent = `(+$${getIncome(rivalBase)}/s)`;
+  document.getElementById('rival-income').textContent = `+ $${getIncome(rivalBase)}/s`;
 
   renderer.render(scene, camera);
 }
