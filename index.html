@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Steal a Brainrot - 3D Edition</title>
+<title>Steal a Brainrot - Click to Move Edition</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-  body { background-color: #0d0d12; color: #fff; overflow: hidden; }
+  body { background-color: #0d0d12; color: #fff; overflow: hidden; user-select: none; }
   #ui-bar {
     position: absolute;
     top: 15px;
@@ -72,14 +72,14 @@
 <div id="crosshair"></div>
 
 <div id="controls-hint">
-  Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> &nbsp;|&nbsp; Look: Click & Drag Mouse &nbsp;|&nbsp; Buy/Steal/Slap: <kbd>SPACE</kbd> or <kbd>E</kbd>
+  Move: <kbd>Left Click on Ground</kbd> &nbsp;|&nbsp; Buy/Steal/Slap: <kbd>SPACE</kbd> or <kbd>E</kbd>
 </div>
 
 <!-- Load Three.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
 <script>
-// Brainrot Tiers (using distinct colors and shapes)
+// Brainrot Tiers
 const BRAINROT_TYPES = [
   { name: "Skibidi", cost: 25, income: 3, color: 0x94a3b8, shape: "box" },
   { name: "Rizzler", cost: 75, income: 10, color: 0x38bdf8, shape: "sphere" },
@@ -154,18 +154,28 @@ function createBaseVisual(base, colorHex) {
 createBaseVisual(playerBase, 0x3b82f6);
 createBaseVisual(rivalBase, 0xef4444);
 
-// Game Entities
+// Game Entities with Click-to-Move Targets
 let player = {
-  x: -18, y: 1.2, z: 8, radius: 1.2, speed: 0.12,
+  x: -18, y: 1.2, z: 8, targetX: -18, targetZ: 8, speed: 0.15,
   cash: 50, carrying: null
 };
 
 let bot = {
-  x: 18, y: 1.2, z: -8, radius: 1.2, speed: 0.08,
+  x: 18, y: 1.2, z: -8, speed: 0.08,
   cash: 50, carrying: null, mesh: null, stunTimer: 0
 };
 
-// Create Bot Mesh (using standard Box/Cylinder combination to avoid version issues)
+// Create Player Character Mesh (Friendly capsule avatar)
+const playerGroup = new THREE.Group();
+const playerBodyGeo = new THREE.CylinderGeometry(0.8, 0.8, 2, 16);
+const playerMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
+const playerMesh = new THREE.Mesh(playerBodyGeo, playerMat);
+playerMesh.position.y = 1;
+playerGroup.add(playerMesh);
+playerGroup.position.set(player.x, 0, player.z);
+scene.add(playerGroup);
+
+// Create Bot Character Mesh
 const botGroup = new THREE.Group();
 const botBodyGeo = new THREE.CylinderGeometry(0.8, 0.8, 2, 16);
 const botMat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
@@ -181,27 +191,26 @@ let conveyorItems = [];
 let spawnTimer = 0;
 let incomeTimer = 0;
 
-// Input Management
-const keys = {};
-let isMouseDown = false;
-let cameraYaw = Math.PI / 2;
-let cameraPitch = 0.3;
+// Raycaster for Click-to-Move
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
 
-window.addEventListener('keydown', e => {
-  keys[e.code] = true;
-  if (e.code === 'Space' || e.code === 'KeyE') {
-    handleAction();
+window.addEventListener('click', (e) => {
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObject(floor);
+
+  if (intersects.length > 0) {
+    player.targetX = intersects[0].point.x;
+    player.targetZ = intersects[0].point.z;
   }
 });
-window.addEventListener('keyup', e => keys[e.code] = false);
 
-window.addEventListener('mousedown', () => isMouseDown = true);
-window.addEventListener('mouseup', () => isMouseDown = false);
-window.addEventListener('mousemove', e => {
-  if (isMouseDown) {
-    cameraYaw -= e.movementX * 0.004;
-    cameraPitch -= e.movementY * 0.004;
-    cameraPitch = Math.max(0.1, Math.min(1.4, cameraPitch));
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'KeyE') {
+    handleAction();
   }
 });
 
@@ -213,7 +222,7 @@ function getIncome(base) {
   return base.slots.reduce((sum, s) => sum + (s.item ? s.item.type.income : 0), 0);
 }
 
-// Create 3D Brainrot Object based on type shape
+// Create 3D Brainrot Object
 function createBrainrotMesh(type) {
   let geo;
   if (type.shape === "sphere") geo = new THREE.SphereGeometry(1.1, 16, 16);
@@ -329,6 +338,7 @@ function updateBot() {
 function animate() {
   requestAnimationFrame(animate);
 
+  // Spawn Conveyor Items
   spawnTimer++;
   if (spawnTimer >= 120) {
     spawnTimer = 0;
@@ -342,6 +352,7 @@ function animate() {
     conveyorItems.push({ type, mesh });
   }
 
+  // Move Conveyor Items
   for (let i = conveyorItems.length - 1; i >= 0; i--) {
     conveyorItems[i].mesh.position.z += 0.06;
     conveyorItems[i].mesh.rotation.y += 0.02;
@@ -351,6 +362,7 @@ function animate() {
     }
   }
 
+  // Passive Income Tick
   incomeTimer++;
   if (incomeTimer >= 60) {
     incomeTimer = 0;
@@ -358,21 +370,19 @@ function animate() {
     bot.cash += getIncome(rivalBase);
   }
 
-  let moveX = 0, moveZ = 0;
-  if (keys['KeyW'] || keys['ArrowUp']) moveZ -= 1;
-  if (keys['KeyS'] || keys['ArrowDown']) moveZ += 1;
-  if (keys['KeyA'] || keys['ArrowLeft']) moveX -= 1;
-  if (keys['KeyD'] || keys['ArrowRight']) moveX += 1;
-
-  if (moveX !== 0 || moveZ !== 0) {
-    const angle = Math.atan2(moveX, moveZ) + cameraYaw;
-    player.x += Math.sin(angle) * player.speed;
-    player.z += Math.cos(angle) * player.speed;
+  // Click-to-Move Player Interpolation
+  const pdx = player.targetX - player.x;
+  const pdz = player.targetZ - player.z;
+  const pDist = Math.hypot(pdx, pdz);
+  if (pDist > 0.2) {
+    player.x += (pdx / pDist) * player.speed;
+    player.z += (pdz / pDist) * player.speed;
   }
-
   player.x = Math.max(-28, Math.min(28, player.x));
   player.z = Math.max(-18, Math.min(18, player.z));
+  playerGroup.position.set(player.x, 0, player.z);
 
+  // Player Deposit Check
   if (player.carrying && Math.hypot(player.x - playerBase.x, player.z - playerBase.z) < 4) {
     const slot = getEmptySlot(playerBase);
     if (slot) {
@@ -390,12 +400,13 @@ function animate() {
 
   updateBot();
 
-  const camDist = 10;
-  camera.position.x = player.x + Math.sin(cameraYaw) * Math.cos(cameraPitch) * camDist;
-  camera.position.y = Math.sin(cameraPitch) * camDist + 1;
-  camera.position.z = player.z + Math.cos(cameraYaw) * Math.cos(cameraPitch) * camDist;
-  camera.lookAt(player.x, player.y, player.z);
+  // Smooth Top-Down Isometric Camera Following Player
+  camera.position.x = player.x;
+  camera.position.y = 18;
+  camera.position.z = player.z + 14;
+  camera.lookAt(player.x, 0, player.z);
 
+  // Update UI Elements
   document.getElementById('player-cash').textContent = `$${player.cash}`;
   document.getElementById('player-income').textContent = `(+$${getIncome(playerBase)}/s)`;
   document.getElementById('rival-cash').textContent = `Bot: $${bot.cash}`;
