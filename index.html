@@ -75,8 +75,8 @@
   Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> &nbsp;|&nbsp; Look: Click & Drag Mouse &nbsp;|&nbsp; Buy/Steal/Slap: <kbd>SPACE</kbd> or <kbd>E</kbd>
 </div>
 
-<!-- Load Three.js from CDN -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- Updated to Three.js r136 to support CapsuleGeometry -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r136/three.min.js"></script>
 
 <script>
 // Brainrot Tiers
@@ -136,7 +136,6 @@ function createBaseVisual(base, colorHex, label) {
   group.add(mesh);
 
   // Pedestal slots (6 per base)
-  let idx = 0;
   for (let r = -1; r <= 1; r++) {
     for (let c = -0.5; c <= 0.5; c += 1) {
       const slotX = base.x + c * 3.5;
@@ -149,7 +148,6 @@ function createBaseVisual(base, colorHex, label) {
       group.add(ped);
 
       base.slots.push({ x: slotX, z: slotZ, item: null, mesh: null });
-      idx++;
     }
   }
   scene.add(group);
@@ -160,7 +158,7 @@ createBaseVisual(rivalBase, 0xef4444, "Rival Base");
 // Game Entities
 let player = {
   x: -18, z: 8, radius: 1.2, speed: 0.12,
-  cash: 50, carrying: null, angle: 0
+  cash: 50, carrying: null
 };
 
 let bot = {
@@ -168,7 +166,7 @@ let bot = {
   cash: 50, carrying: null, mesh: null, stunTimer: 0
 };
 
-// Create Bot Mesh
+// Create Bot Mesh using CapsuleGeometry
 const botGeo = new THREE.CapsuleGeometry(0.8, 1.5, 4, 8);
 const botMat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
 bot.mesh = new THREE.Mesh(botGeo, botMat);
@@ -183,7 +181,6 @@ let incomeTimer = 0;
 // Input Management
 const keys = {};
 let isMouseDown = false;
-let mouseX = 0, mouseY = 0;
 let cameraYaw = Math.PI / 2;
 let cameraPitch = 0.3;
 
@@ -221,7 +218,7 @@ function createBrainrotMesh(type) {
   const ctx = canvas.getContext('2d');
   
   ctx.fillStyle = "#232332";
-  ctx.fillRect(0,0,256,256);
+  ctx.fillRect(0, 0, 256, 256);
   ctx.font = "bold 90px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -234,13 +231,11 @@ function createBrainrotMesh(type) {
   const texture = new THREE.CanvasTexture(canvas);
   const geo = new THREE.BoxGeometry(1.8, 1.8, 1.8);
   const mat = new THREE.MeshStandardMaterial({ map: texture, color: type.color });
-  const mesh = new THREE.Mesh(geo, mat);
-  return mesh;
+  return new THREE.Mesh(geo, mat);
 }
 
 // Action Trigger (Buy, Steal, Slap)
 function handleAction() {
-  // 1. Slap Bot if close
   const distToBot = Math.hypot(player.x - bot.x, player.z - bot.z);
   if (distToBot < 3.5) {
     bot.stunTimer = 120;
@@ -253,7 +248,6 @@ function handleAction() {
 
   if (player.carrying) return;
 
-  // 2. Buy from Conveyor Belt
   for (let i = conveyorItems.length - 1; i >= 0; i--) {
     const item = conveyorItems[i];
     const dist = Math.hypot(player.x - item.mesh.position.x, player.z - item.mesh.position.z);
@@ -272,7 +266,6 @@ function handleAction() {
     }
   }
 
-  // 3. Steal from Rival Base
   for (let slot of rivalBase.slots) {
     if (slot.item && Math.hypot(player.x - slot.x, player.z - slot.z) < 2.5) {
       const pSlot = getEmptySlot(playerBase);
@@ -294,7 +287,6 @@ function updateBot() {
   }
   bot.mesh.material.color.setHex(0xef4444);
 
-  // Target assignment
   let targetX = bot.x;
   let targetZ = bot.z;
 
@@ -302,13 +294,11 @@ function updateBot() {
     targetX = rivalBase.x;
     targetZ = rivalBase.z;
   } else {
-    // Find affordable conveyor item
     const affordable = conveyorItems.filter(i => bot.cash >= i.type.cost);
     if (affordable.length > 0 && getEmptySlot(rivalBase)) {
       targetX = affordable[0].mesh.position.x;
       targetZ = affordable[0].mesh.position.z;
 
-      // Buy if close
       if (Math.hypot(bot.x - targetX, bot.z - targetZ) < 2) {
         const item = affordable[0];
         const idx = conveyorItems.indexOf(item);
@@ -323,7 +313,6 @@ function updateBot() {
     }
   }
 
-  // Move bot toward target
   const dx = targetX - bot.x;
   const dz = targetZ - bot.z;
   const dist = Math.hypot(dx, dz);
@@ -333,7 +322,6 @@ function updateBot() {
   }
   bot.mesh.position.set(bot.x, 1.2, bot.z);
 
-  // Bot deposit
   if (bot.carrying && Math.hypot(bot.x - rivalBase.x, bot.z - rivalBase.z) < 3.5) {
     const slot = getEmptySlot(rivalBase);
     if (slot) {
@@ -349,7 +337,6 @@ function updateBot() {
 function animate() {
   requestAnimationFrame(animate);
 
-  // 1. Spawn Conveyor items
   spawnTimer++;
   if (spawnTimer >= 120) {
     spawnTimer = 0;
@@ -363,7 +350,6 @@ function animate() {
     conveyorItems.push({ type, mesh });
   }
 
-  // Move conveyor items forward
   for (let i = conveyorItems.length - 1; i >= 0; i--) {
     conveyorItems[i].mesh.position.z += 0.06;
     if (conveyorItems[i].mesh.position.z > 18) {
@@ -372,7 +358,6 @@ function animate() {
     }
   }
 
-  // 2. Passive Income Tick (every 60 frames = 1s)
   incomeTimer++;
   if (incomeTimer >= 60) {
     incomeTimer = 0;
@@ -380,7 +365,6 @@ function animate() {
     bot.cash += getIncome(rivalBase);
   }
 
-  // 3. Player Movement relative to camera angle
   let moveX = 0, moveZ = 0;
   if (keys['KeyW'] || keys['ArrowUp']) moveZ -= 1;
   if (keys['KeyS'] || keys['ArrowDown']) moveZ += 1;
@@ -393,11 +377,9 @@ function animate() {
     player.z += Math.cos(angle) * player.speed;
   }
 
-  // Arena bounds check
   player.x = Math.max(-28, Math.min(28, player.x));
   player.z = Math.max(-18, Math.min(18, player.z));
 
-  // Player Deposit
   if (player.carrying && Math.hypot(player.x - playerBase.x, player.z - playerBase.z) < 4) {
     const slot = getEmptySlot(playerBase);
     if (slot) {
@@ -408,7 +390,6 @@ function animate() {
     }
   }
 
-  // Position carried item above player
   if (player.carrying) {
     player.carrying.mesh.position.set(player.x, 3.2, player.z);
     player.carrying.mesh.rotation.y += 0.03;
@@ -416,14 +397,12 @@ function animate() {
 
   updateBot();
 
-  // 4. Camera Follows Player smoothly
   const camDist = 10;
   camera.position.x = player.x + Math.sin(cameraYaw) * Math.cos(cameraPitch) * camDist;
   camera.position.y = Math.sin(cameraPitch) * camDist + 1;
   camera.position.z = player.z + Math.cos(cameraYaw) * Math.cos(cameraPitch) * camDist;
   camera.lookAt(player.x, player.y + 1.2, player.z);
 
-  // 5. Update UI
   document.getElementById('player-cash').textContent = `$${player.cash}`;
   document.getElementById('player-income').textContent = `(+$${getIncome(playerBase)}/s)`;
   document.getElementById('rival-cash').textContent = `Bot: $${bot.cash}`;
@@ -434,7 +413,6 @@ function animate() {
 
 animate();
 
-// Resize Handler
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
