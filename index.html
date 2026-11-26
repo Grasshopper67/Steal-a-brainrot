@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Steal a Brainrot - Roblox Tycoon Style</title>
+<title>Steal a Brainrot - Custom Character Edition</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
   body { background-color: #08080c; color: #fff; overflow: hidden; user-select: none; }
@@ -13,7 +13,7 @@
     top: 15px;
     left: 50%;
     transform: translateX(-50%);
-    width: 850px;
+    width: 650px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -28,7 +28,6 @@
   .stat { font-size: 20px; font-weight: 900; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
   .money { color: #4ade80; }
   .income { color: #facc15; font-size: 13px; font-weight: 600; display: block; }
-  .rival-money { color: #f87171; }
   .title {
     font-weight: 900;
     letter-spacing: 2px;
@@ -88,26 +87,24 @@
   </div>
   <div class="title">STEAL A BRAINROT</div>
   <div>
-    <span class="stat rival-money" id="rival-cash">Bot: $50</span>
-    <span class="income" id="rival-income">+ $0/s</span>
+    <span class="stat money" id="rebirth-stat">Rebirths: 0</span>
   </div>
 </div>
 
 <div id="shop-panel">
   <button class="shop-btn" onclick="buySpeedCoil()">⚡ Speed Coil ($300)</button>
-  <button class="shop-btn" onclick="buyBaseShield()">🛡️ Base Shield ($500)</button>
   <button class="shop-btn" onclick="buyRebirth()">✨ Rebirth (2x Income, $2000)</button>
 </div>
 
 <div id="controls-hint">
-  Move: <kbd>Left Click on Ground</kbd> &nbsp;|&nbsp; Buy / Steal / Slap: <kbd>SPACE</kbd> or <kbd>E</kbd>
+  Move: <kbd>Left Click Ground</kbd> &nbsp;|&nbsp; Rotate Camera: <kbd>Hold Right Click & Drag</kbd> &nbsp;|&nbsp; Buy / Place: <kbd>SPACE</kbd> or <kbd>E</kbd>
 </div>
 
 <!-- Load Three.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
 <script>
-// Brainrot Tycoon Tiers (Roblox Meme Style)
+// Brainrot Tiers with Emoji & Costs
 const BRAINROT_TYPES = [
   { name: "Skibidi", cost: 25, income: 3, color: 0x94a3b8, emoji: "🚽" },
   { name: "Rizzler", cost: 75, income: 10, color: 0x38bdf8, emoji: "😎" },
@@ -128,7 +125,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-// Lighting for Tycoon Polish
+// Lighting
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
 scene.add(ambientLight);
 
@@ -139,15 +136,15 @@ dirLight.shadow.mapSize.width = 2048;
 dirLight.shadow.mapSize.height = 2048;
 scene.add(dirLight);
 
-// Neon Grid Arena Floor
+// Arena Ground
 const floorGeo = new THREE.PlaneGeometry(64, 44);
-const floorMat = new THREE.MeshStandardMaterial({ color: 0x13131c, roughness: 0.9, metalness: 0.1 });
+const floorMat = new THREE.MeshStandardMaterial({ color: 0x13131c, roughness: 0.9 });
 const floor = new THREE.Mesh(floorGeo, floorMat);
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
 
-// Center Industrial Conveyor Belt with Neon Glow Borders
+// Center Conveyor Belt
 const convGeo = new THREE.BoxGeometry(5.8, 0.15, 44);
 const convMat = new THREE.MeshStandardMaterial({ color: 0x1b1b26, roughness: 0.5 });
 const conveyor = new THREE.Mesh(convGeo, convMat);
@@ -161,21 +158,17 @@ const rightLine = new THREE.Mesh(lineGeo, lineMat); rightLine.position.set(2.9, 
 scene.add(leftLine);
 scene.add(rightLine);
 
-// Bases Definition (Blue Player Base vs Red Rival Base)
-const playerBase = { x: -20, z: 0, w: 10, h: 14, slots: [], shield: false };
-const rivalBase = { x: 20, z: 0, w: 10, h: 14, slots: [], shield: false };
+// Player Base Definition
+const playerBase = { x: -18, z: 0, w: 10, h: 14, slots: [] };
 
-function createBaseVisual(base, colorHex, glowColor) {
+function createBaseVisual(base, colorHex) {
   const group = new THREE.Group();
-  
-  // Neon Base Platform
   const baseGeo = new THREE.BoxGeometry(base.w, 0.25, base.h);
   const baseMat = new THREE.MeshStandardMaterial({ color: colorHex, transparent: true, opacity: 0.35, roughness: 0.2 });
   const mesh = new THREE.Mesh(baseGeo, baseMat);
   mesh.position.set(base.x, 0.12, base.z);
   group.add(mesh);
 
-  // Pedestals
   for (let r = -1; r <= 1; r++) {
     for (let c = -0.5; c <= 0.5; c += 1) {
       const slotX = base.x + c * 3.6;
@@ -193,111 +186,83 @@ function createBaseVisual(base, colorHex, glowColor) {
   scene.add(group);
 }
 createBaseVisual(playerBase, 0x3b82f6);
-createBaseVisual(rivalBase, 0xef4444);
 
-// Helper: Create 3D Floating Emoji Icon Texture for Meme Brainrots
-function createBrainrotMesh(type) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  
-  // Card Background
-  ctx.fillStyle = "#181824";
-  ctx.roundRect ? ctx.roundRect(10, 10, 236, 236, 30) : ctx.fillRect(10, 10, 236, 236);
-  ctx.fillStyle = type.color;
-  ctx.globalAlpha = 0.25;
-  ctx.fill();
-  ctx.globalAlpha = 1.0;
-
-  // Border
-  ctx.strokeStyle = type.color;
-  ctx.lineWidth = 10;
-  ctx.stroke();
-
-  // Emoji
-  ctx.font = "100px sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(type.emoji, 128, 100);
-
-  // Name Label
-  ctx.font = "bold 26px sans-serif";
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(type.name, 128, 200);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  const geo = new THREE.BoxGeometry(1.8, 1.8, 0.4);
-  const mat = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.3 });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.castShadow = true;
-  return mesh;
-}
-
-// Game Entities
+// Player State
 let player = {
-  x: -20, y: 1.2, z: 8, targetX: -20, targetZ: 8, speed: 0.16,
-  cash: 50, carrying: null, rebirthMultiplier: 1
+  x: -18, y: 1.2, z: 8, targetX: -18, targetZ: 8, speed: 0.16,
+  cash: 50, carrying: null, rebirths: 0, rebirthMultiplier: 1
 };
 
-let bot = {
-  x: 20, y: 1.2, z: -8, speed: 0.08,
-  cash: 50, carrying: null, mesh: null, stunTimer: 0
-};
-
-// Player Avatar (Roblox Style Capsule Blocky Character)
+// Build Detailed Character Avatar (Head, Eyes, Body, Arms, Legs)
 const playerGroup = new THREE.Group();
-const playerBodyGeo = new THREE.BoxGeometry(1.2, 2, 0.8);
-const playerMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.3 });
-const playerMesh = new THREE.Mesh(playerBodyGeo, playerMat);
-playerMesh.position.y = 1;
-playerMesh.castShadow = true;
-playerGroup.add(playerMesh);
+
+// Body
+const bodyGeo = new THREE.BoxGeometry(1.0, 1.2, 0.6);
+const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.3 });
+const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+bodyMesh.position.y = 1.1;
+bodyMesh.castShadow = true;
+playerGroup.add(bodyMesh);
+
+// Head
+const headGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+const headMat = new THREE.MeshStandardMaterial({ color: 0xffdbac, roughness: 0.4 });
+const headMesh = new THREE.Mesh(headGeo, headMat);
+headMesh.position.y = 2.1;
+headMesh.castShadow = true;
+playerGroup.add(headMesh);
+
+// Eyes (Glasses style)
+const eyeGeo = new THREE.BoxGeometry(0.6, 0.2, 0.1);
+const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+const eyeMesh = new THREE.Mesh(eyeGeo, eyeMat);
+eyeMesh.position.set(0, 2.15, 0.41);
+playerGroup.add(eyeMesh);
+
+// Legs
+const legGeo = new THREE.BoxGeometry(0.35, 0.9, 0.4);
+const legMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
+const leftLeg = new THREE.Mesh(legGeo, legMat); leftLeg.position.set(-0.25, 0.45, 0);
+const rightLeg = new THREE.Mesh(legGeo, legMat); rightLeg.position.set(0.25, 0.45, 0);
+playerGroup.add(leftLeg);
+playerGroup.add(rightLeg);
+
 playerGroup.position.set(player.x, 0, player.z);
 scene.add(playerGroup);
-
-// Rival Bot Avatar
-const botGroup = new THREE.Group();
-const botBodyGeo = new THREE.BoxGeometry(1.2, 2, 0.8);
-const botMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3 });
-const botMesh = new THREE.Mesh(botBodyGeo, botMat);
-botMesh.position.y = 1;
-botMesh.castShadow = true;
-botGroup.add(botMesh);
-botGroup.position.set(bot.x, 0, bot.z);
-scene.add(botGroup);
-bot.mesh = botGroup;
 
 // Conveyor Items & Timers
 let conveyorItems = [];
 let spawnTimer = 0;
 let incomeTimer = 0;
 
-// Shop Purchases
-function buySpeedCoil() {
-  if (player.cash >= 300) {
-    player.cash -= 300;
-    player.speed = 0.24;
-  }
-}
-function buyBaseShield() {
-  if (player.cash >= 500) {
-    player.cash -= 500;
-    playerBase.shield = true;
-  }
-}
-function buyRebirth() {
-  if (player.cash >= 2000) {
-    player.cash -= 2000;
-    player.rebirthMultiplier *= 2;
-  }
-}
+// Camera Orbit Variables for Right-Click Drag
+let isRightMouseDown = false;
+let cameraAngle = 0;
+let cameraPitch = 0.5;
+let cameraDist = 14;
 
-// Click-to-Move Raycasting
+window.addEventListener('mousedown', (e) => {
+  if (e.button === 2) isRightMouseDown = true; // Right Click
+});
+window.addEventListener('mouseup', (e) => {
+  if (e.button === 2) isRightMouseDown = false;
+});
+window.addEventListener('contextmenu', e => e.preventDefault()); // Disable right-click context menu
+
+window.addEventListener('mousemove', (e) => {
+  if (isRightMouseDown) {
+    cameraAngle -= e.movementX * 0.005;
+    cameraPitch -= e.movementY * 0.005;
+    cameraPitch = Math.max(0.2, Math.min(1.2, cameraPitch)); // Clamp height
+  }
+});
+
+// Click to Move on Ground (Left Click)
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
 window.addEventListener('click', (e) => {
+  if (e.button !== 0) return;
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
 
@@ -316,27 +281,72 @@ window.addEventListener('keydown', e => {
   }
 });
 
+// Shop Functions
+function buySpeedCoil() {
+  if (player.cash >= 300) {
+    player.cash -= 300;
+    player.speed = 0.25;
+  }
+}
+function buyRebirth() {
+  if (player.cash >= 2000) {
+    player.cash -= 2000;
+    player.rebirths++;
+    player.rebirthMultiplier *= 2;
+    document.getElementById('rebirth-stat').textContent = `Rebirths: ${player.rebirths}`;
+  }
+}
+
 function getEmptySlot(base) {
   return base.slots.find(s => s.item === null);
 }
 
 function getIncome(base) {
-  const baseInc = base.slots.reduce((sum, s) => sum + (s.item ? s.item.type.income : 0), 0);
-  return base === playerBase ? baseInc * player.rebirthMultiplier : baseInc;
+  return base.slots.reduce((sum, s) => sum + (s.item ? s.item.type.income : 0), 0) * player.rebirthMultiplier;
 }
 
-// Core Gameplay Actions: Slap, Buy, Steal
-function handleAction() {
-  const distToBot = Math.hypot(player.x - bot.x, player.z - bot.z);
-  if (distToBot < 3.5) {
-    bot.stunTimer = 140;
-    if (bot.carrying) {
-      scene.remove(bot.carrying.mesh);
-      bot.carrying = null;
-    }
-    return;
-  }
+// Create 3D Brainrot Object with COST DISPLAYED UNDERNEATH
+function createBrainrotMesh(type) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 300;
+  const ctx = canvas.getContext('2d');
+  
+  // Background Card
+  ctx.fillStyle = "#181824";
+  ctx.fillRect(10, 10, 236, 280);
+  ctx.fillStyle = type.color;
+  ctx.globalAlpha = 0.2;
+  ctx.fill();
+  ctx.globalAlpha = 1.0;
 
+  ctx.strokeStyle = type.color;
+  ctx.lineWidth = 8;
+  ctx.strokeRect(10, 10, 236, 280);
+
+  // Emoji
+  ctx.font = "80px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(type.emoji, 128, 85);
+
+  // Name
+  ctx.font = "bold 24px sans-serif";
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(type.name, 128, 160);
+
+  // Cost Underneath
+  ctx.font = "bold 26px sans-serif";
+  ctx.fillStyle = "#4ade80";
+  ctx.fillText(`Cost: $${type.cost}`, 128, 220);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const geo = new THREE.BoxGeometry(1.8, 2.1, 0.4);
+  const mat = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.3 });
+  return new THREE.Mesh(geo, mat);
+}
+
+function handleAction() {
   if (player.carrying) return;
 
   // Buy from Conveyor Belt
@@ -357,86 +367,18 @@ function handleAction() {
       }
     }
   }
-
-  // Steal from Rival Base (unless protected by shield)
-  if (rivalBase.shield) return;
-  for (let slot of rivalBase.slots) {
-    if (slot.item && Math.hypot(player.x - slot.x, player.z - slot.z) < 2.5) {
-      const pSlot = getEmptySlot(playerBase);
-      if (!pSlot) return;
-
-      player.carrying = slot.item;
-      slot.item = null;
-      return;
-    }
-  }
-}
-
-// Bot AI Logic
-function updateBot() {
-  if (bot.stunTimer > 0) {
-    bot.stunTimer--;
-    bot.mesh.children[0].material.color.setHex(0x64748b);
-    return;
-  }
-  bot.mesh.children[0].material.color.setHex(0xef4444);
-
-  let targetX = bot.x;
-  let targetZ = bot.z;
-
-  if (bot.carrying) {
-    targetX = rivalBase.x;
-    targetZ = rivalBase.z;
-  } else {
-    const affordable = conveyorItems.filter(i => bot.cash >= i.type.cost);
-    if (affordable.length > 0 && getEmptySlot(rivalBase)) {
-      targetX = affordable[0].mesh.position.x;
-      targetZ = affordable[0].mesh.position.z;
-
-      if (Math.hypot(bot.x - targetX, bot.z - targetZ) < 2) {
-        const item = affordable[0];
-        const idx = conveyorItems.indexOf(item);
-        if (idx !== -1) {
-          bot.cash -= item.type.cost;
-          bot.carrying = { type: item.type, mesh: createBrainrotMesh(item.type) };
-          scene.add(bot.carrying.mesh);
-          scene.remove(item.mesh);
-          conveyorItems.splice(idx, 1);
-        }
-      }
-    }
-  }
-
-  const dx = targetX - bot.x;
-  const dz = targetZ - bot.z;
-  const dist = Math.hypot(dx, dz);
-  if (dist > 0.5) {
-    bot.x += (dx / dist) * bot.speed;
-    bot.z += (dz / dist) * bot.speed;
-  }
-  bot.mesh.position.set(bot.x, 0, bot.z);
-
-  if (bot.carrying && Math.hypot(bot.x - rivalBase.x, bot.z - rivalBase.z) < 3.5) {
-    const slot = getEmptySlot(rivalBase);
-    if (slot) {
-      slot.item = bot.carrying;
-      slot.item.mesh.position.set(slot.x, 1.3, slot.z);
-      scene.add(slot.item.mesh);
-      bot.carrying = null;
-    }
-  }
 }
 
 // Main Game Loop
 function animate() {
   requestAnimationFrame(animate);
 
-  // Spawn Meme Brainrots on Conveyor
+  // Slower Conveyor Spawn Rate & Movement
   spawnTimer++;
-  if (spawnTimer >= 110) {
+  if (spawnTimer >= 150) {
     spawnTimer = 0;
     const rand = Math.random();
-    let tier = rand > 0.92 ? 4 : (rand > 0.78 ? 3 : (rand > 0.5 ? 2 : (rand > 0.25 ? 1 : 0)));
+    let tier = rand > 0.9 ? 4 : (rand > 0.7 ? 3 : (rand > 0.4 ? 2 : (rand > 0.2 ? 1 : 0)));
     const type = BRAINROT_TYPES[tier];
     
     const mesh = createBrainrotMesh(type);
@@ -445,10 +387,10 @@ function animate() {
     conveyorItems.push({ type, mesh });
   }
 
-  // Move Conveyor Items Forward
+  // Move conveyor items slower (0.035 instead of 0.07)
   for (let i = conveyorItems.length - 1; i >= 0; i--) {
-    conveyorItems[i].mesh.position.z += 0.07;
-    conveyorItems[i].mesh.rotation.y += 0.025;
+    conveyorItems[i].mesh.position.z += 0.035;
+    conveyorItems[i].mesh.rotation.y += 0.015;
     if (conveyorItems[i].mesh.position.z > 20) {
       scene.remove(conveyorItems[i].mesh);
       conveyorItems.splice(i, 1);
@@ -460,7 +402,6 @@ function animate() {
   if (incomeTimer >= 60) {
     incomeTimer = 0;
     player.cash += getIncome(playerBase);
-    bot.cash += getIncome(rivalBase);
   }
 
   // Smooth Player Movement
@@ -471,8 +412,8 @@ function animate() {
     player.x += (pdx / pDist) * player.speed;
     player.z += (pdz / pDist) * player.speed;
   }
-  player.x = Math.max(-30, Math.min(30, player.x));
-  player.z = Math.max(-20, Math.min(20, player.z));
+  player.x = Math.max(-28, Math.min(28, player.x));
+  player.z = Math.max(-18, Math.min(18, player.z));
   playerGroup.position.set(player.x, 0, player.z);
 
   // Player Deposit into Base
@@ -486,25 +427,20 @@ function animate() {
     }
   }
 
-  // Float carried item above player's head
   if (player.carrying) {
-    player.carrying.mesh.position.set(player.x, player.y + 2.5, player.z);
-    player.carrying.mesh.rotation.y += 0.04;
+    player.carrying.mesh.position.set(player.x, player.y + 3.0, player.z);
+    player.carrying.mesh.rotation.y += 0.03;
   }
 
-  updateBot();
-
-  // Smooth Isometric Camera Tracking
-  camera.position.x = player.x;
-  camera.position.y = 19;
-  camera.position.z = player.z + 14;
-  camera.lookAt(player.x, 0, player.z);
+  // Camera Orbit Controlled by Right-Click Drag
+  camera.position.x = player.x + Math.sin(cameraAngle) * Math.cos(cameraPitch) * cameraDist;
+  camera.position.y = player.y + Math.sin(cameraPitch) * cameraDist + 2;
+  camera.position.z = player.z + Math.cos(cameraAngle) * Math.cos(cameraPitch) * cameraDist;
+  camera.lookAt(player.x, player.y + 1, player.z);
 
   // Update UI Stats
   document.getElementById('player-cash').textContent = `$${player.cash}`;
   document.getElementById('player-income').textContent = `+ $${getIncome(playerBase)}/s`;
-  document.getElementById('rival-cash').textContent = `Bot: $${bot.cash}`;
-  document.getElementById('rival-income').textContent = `+ $${getIncome(rivalBase)}/s`;
 
   renderer.render(scene, camera);
 }
