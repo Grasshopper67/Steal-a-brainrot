@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Steal a Brainrot - Custom Character Edition</title>
+<title>Steal a Brainrot - Roblox Movement Edition</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
   body { background-color: #08080c; color: #fff; overflow: hidden; user-select: none; }
@@ -97,7 +97,7 @@
 </div>
 
 <div id="controls-hint">
-  Move: <kbd>Left Click Ground</kbd> &nbsp;|&nbsp; Rotate Camera: <kbd>Hold Right Click & Drag</kbd> &nbsp;|&nbsp; Buy / Place: <kbd>SPACE</kbd> or <kbd>E</kbd>
+  Move: <kbd>W A S D</kbd> or <kbd>Arrow Keys</kbd> &nbsp;|&nbsp; Rotate Camera: <kbd>Hold Right Click & Drag</kbd> &nbsp;|&nbsp; Buy / Place: <kbd>SPACE</kbd> or <kbd>E</kbd>
 </div>
 
 <!-- Load Three.js -->
@@ -189,14 +189,13 @@ createBaseVisual(playerBase, 0x3b82f6);
 
 // Player State
 let player = {
-  x: -18, y: 1.2, z: 8, targetX: -18, targetZ: 8, speed: 0.16,
+  x: -18, y: 1.2, z: 8, speed: 0.16,
   cash: 50, carrying: null, rebirths: 0, rebirthMultiplier: 1
 };
 
-// Build Detailed Character Avatar (Head, Eyes, Body, Arms, Legs)
+// Build Detailed Character Avatar
 const playerGroup = new THREE.Group();
 
-// Body
 const bodyGeo = new THREE.BoxGeometry(1.0, 1.2, 0.6);
 const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.3 });
 const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
@@ -204,7 +203,6 @@ bodyMesh.position.y = 1.1;
 bodyMesh.castShadow = true;
 playerGroup.add(bodyMesh);
 
-// Head
 const headGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
 const headMat = new THREE.MeshStandardMaterial({ color: 0xffdbac, roughness: 0.4 });
 const headMesh = new THREE.Mesh(headGeo, headMat);
@@ -212,14 +210,12 @@ headMesh.position.y = 2.1;
 headMesh.castShadow = true;
 playerGroup.add(headMesh);
 
-// Eyes (Glasses style)
 const eyeGeo = new THREE.BoxGeometry(0.6, 0.2, 0.1);
 const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
 const eyeMesh = new THREE.Mesh(eyeGeo, eyeMat);
 eyeMesh.position.set(0, 2.15, 0.41);
 playerGroup.add(eyeMesh);
 
-// Legs
 const legGeo = new THREE.BoxGeometry(0.35, 0.9, 0.4);
 const legMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
 const leftLeg = new THREE.Mesh(legGeo, legMat); leftLeg.position.set(-0.25, 0.45, 0);
@@ -230,54 +226,42 @@ playerGroup.add(rightLeg);
 playerGroup.position.set(player.x, 0, player.z);
 scene.add(playerGroup);
 
+// Input Tracking for WASD / Arrow Keys
+const keys = {};
+window.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'Space' || e.code === 'KeyE') {
+    handleAction();
+  }
+});
+window.addEventListener('keyup', e => {
+  keys[e.code] = false;
+});
+
 // Conveyor Items & Timers
 let conveyorItems = [];
 let spawnTimer = 0;
 let incomeTimer = 0;
 
-// Camera Orbit Variables for Right-Click Drag
+// Camera Orbit via Right-Click Drag
 let isRightMouseDown = false;
 let cameraAngle = 0;
 let cameraPitch = 0.5;
 let cameraDist = 14;
 
 window.addEventListener('mousedown', (e) => {
-  if (e.button === 2) isRightMouseDown = true; // Right Click
+  if (e.button === 2) isRightMouseDown = true;
 });
 window.addEventListener('mouseup', (e) => {
   if (e.button === 2) isRightMouseDown = false;
 });
-window.addEventListener('contextmenu', e => e.preventDefault()); // Disable right-click context menu
+window.addEventListener('contextmenu', e => e.preventDefault());
 
 window.addEventListener('mousemove', (e) => {
   if (isRightMouseDown) {
     cameraAngle -= e.movementX * 0.005;
     cameraPitch -= e.movementY * 0.005;
-    cameraPitch = Math.max(0.2, Math.min(1.2, cameraPitch)); // Clamp height
-  }
-});
-
-// Click to Move on Ground (Left Click)
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-
-window.addEventListener('click', (e) => {
-  if (e.button !== 0) return;
-  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-
-  raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObject(floor);
-
-  if (intersects.length > 0) {
-    player.targetX = intersects[0].point.x;
-    player.targetZ = intersects[0].point.z;
-  }
-});
-
-window.addEventListener('keydown', e => {
-  if (e.code === 'Space' || e.code === 'KeyE') {
-    handleAction();
+    cameraPitch = Math.max(0.2, Math.min(1.2, cameraPitch));
   }
 });
 
@@ -305,14 +289,13 @@ function getIncome(base) {
   return base.slots.reduce((sum, s) => sum + (s.item ? s.item.type.income : 0), 0) * player.rebirthMultiplier;
 }
 
-// Create 3D Brainrot Object with COST DISPLAYED UNDERNEATH
+// Create 3D Brainrot Object with Cost Underneath
 function createBrainrotMesh(type) {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 300;
   const ctx = canvas.getContext('2d');
   
-  // Background Card
   ctx.fillStyle = "#181824";
   ctx.fillRect(10, 10, 236, 280);
   ctx.fillStyle = type.color;
@@ -324,18 +307,15 @@ function createBrainrotMesh(type) {
   ctx.lineWidth = 8;
   ctx.strokeRect(10, 10, 236, 280);
 
-  // Emoji
   ctx.font = "80px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(type.emoji, 128, 85);
 
-  // Name
   ctx.font = "bold 24px sans-serif";
   ctx.fillStyle = "#ffffff";
   ctx.fillText(type.name, 128, 160);
 
-  // Cost Underneath
   ctx.font = "bold 26px sans-serif";
   ctx.fillStyle = "#4ade80";
   ctx.fillText(`Cost: $${type.cost}`, 128, 220);
@@ -349,7 +329,6 @@ function createBrainrotMesh(type) {
 function handleAction() {
   if (player.carrying) return;
 
-  // Buy from Conveyor Belt
   for (let i = conveyorItems.length - 1; i >= 0; i--) {
     const item = conveyorItems[i];
     const dist = Math.hypot(player.x - item.mesh.position.x, player.z - item.mesh.position.z);
@@ -373,7 +352,7 @@ function handleAction() {
 function animate() {
   requestAnimationFrame(animate);
 
-  // Slower Conveyor Spawn Rate & Movement
+  // Spawn Conveyor Items
   spawnTimer++;
   if (spawnTimer >= 150) {
     spawnTimer = 0;
@@ -387,7 +366,6 @@ function animate() {
     conveyorItems.push({ type, mesh });
   }
 
-  // Move conveyor items slower (0.035 instead of 0.07)
   for (let i = conveyorItems.length - 1; i >= 0; i--) {
     conveyorItems[i].mesh.position.z += 0.035;
     conveyorItems[i].mesh.rotation.y += 0.015;
@@ -397,26 +375,38 @@ function animate() {
     }
   }
 
-  // Passive Income Tick
   incomeTimer++;
   if (incomeTimer >= 60) {
     incomeTimer = 0;
     player.cash += getIncome(playerBase);
   }
 
-  // Smooth Player Movement
-  const pdx = player.targetX - player.x;
-  const pdz = player.targetZ - player.z;
-  const pDist = Math.hypot(pdx, pdz);
-  if (pDist > 0.2) {
-    player.x += (pdx / pDist) * player.speed;
-    player.z += (pdz / pDist) * player.speed;
+  // Roblox-style Keyboard Movement (WASD / Arrow Keys relative to camera angle)
+  let moveX = 0, moveZ = 0;
+  if (keys['KeyW'] || keys['ArrowUp']) moveZ -= 1;
+  if (keys['KeyS'] || keys['ArrowDown']) moveZ += 1;
+  if (keys['KeyA'] || keys['ArrowLeft']) moveX -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) moveX += 1;
+
+  if (moveX !== 0 || moveZ !== 0) {
+    // Normalize diagonal movement and align with camera orbit angle
+    const length = Math.hypot(moveX, moveZ);
+    moveX /= length;
+    moveZ /= length;
+
+    const angle = Math.atan2(moveX, moveZ) + cameraAngle;
+    player.x += Math.sin(angle) * player.speed;
+    player.z += Math.cos(angle) * player.speed;
+
+    // Face character toward movement direction
+    playerGroup.rotation.y = angle;
   }
+
   player.x = Math.max(-28, Math.min(28, player.x));
   player.z = Math.max(-18, Math.min(18, player.z));
   playerGroup.position.set(player.x, 0, player.z);
 
-  // Player Deposit into Base
+  // Deposit into Base
   if (player.carrying && Math.hypot(player.x - playerBase.x, player.z - playerBase.z) < 4) {
     const slot = getEmptySlot(playerBase);
     if (slot) {
@@ -432,7 +422,7 @@ function animate() {
     player.carrying.mesh.rotation.y += 0.03;
   }
 
-  // Camera Orbit Controlled by Right-Click Drag
+  // Camera Orbit Follows Player
   camera.position.x = player.x + Math.sin(cameraAngle) * Math.cos(cameraPitch) * cameraDist;
   camera.position.y = player.y + Math.sin(cameraPitch) * cameraDist + 2;
   camera.position.z = player.z + Math.cos(cameraAngle) * Math.cos(cameraPitch) * cameraDist;
