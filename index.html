@@ -3,52 +3,56 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Steal a Brainrot - 2D Edition</title>
+<title>Steal a Brainrot - 3D Edition</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-  body {
-    background-color: #121218;
-    color: #ffffff;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-    overflow: hidden;
-  }
+  body { background-color: #0d0d12; color: #fff; overflow: hidden; }
   #ui-bar {
-    width: 900px;
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #1e1e2a;
-    padding: 12px 20px;
-    border-radius: 10px 10px 0 0;
-    border: 2px solid #33334d;
-    border-bottom: none;
+    background: rgba(30, 30, 42, 0.85);
+    backdrop-filter: blur(8px);
+    padding: 12px 25px;
+    border-radius: 12px;
+    border: 2px solid rgba(255,255,255,0.1);
+    z-index: 10;
   }
   .stat { font-size: 18px; font-weight: bold; }
   .money { color: #4ade80; }
-  .income { color: #facc15; font-size: 14px; }
+  .income { color: #facc15; font-size: 13px; }
   .rival-money { color: #f87171; }
-  canvas {
-    background: #232332;
-    border: 2px solid #33334d;
-    border-radius: 0 0 10px 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+  #crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    background-color: rgba(255,255,255,0.7);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 10;
   }
   #controls-hint {
-    margin-top: 10px;
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.6);
+    padding: 8px 16px;
+    border-radius: 8px;
     color: #9ca3af;
-    font-size: 14px;
+    font-size: 13px;
+    z-index: 10;
+    pointer-events: none;
   }
-  kbd {
-    background: #2d2d3f;
-    padding: 2px 6px;
-    border-radius: 4px;
-    border: 1px solid #4b4b66;
-    color: #fff;
-  }
+  kbd { background: #2d2d3f; padding: 2px 6px; border-radius: 4px; border: 1px solid #4b4b66; color: #fff; }
 </style>
 </head>
 <body>
@@ -58,142 +62,224 @@
     <span class="stat money" id="player-cash">$50</span>
     <span class="income" id="player-income">(+$0/s)</span>
   </div>
-  <div style="font-weight: 800; letter-spacing: 1px; color: #c084fc;">STEAL A BRAINROT</div>
+  <div style="font-weight: 800; letter-spacing: 1px; color: #c084fc;">STEAL A BRAINROT 3D</div>
   <div>
     <span class="stat rival-money" id="rival-cash">Bot: $50</span>
     <span class="income" id="rival-income">(+$0/s)</span>
   </div>
 </div>
 
-<canvas id="gameCanvas" width="900" height="550"></canvas>
+<div id="crosshair"></div>
 
 <div id="controls-hint">
-  Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>Arrows</kbd> &nbsp;|&nbsp; 
-  Buy / Steal / Slap: <kbd>SPACE</kbd> or <kbd>E</kbd>
+  Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> &nbsp;|&nbsp; Look: Click & Drag Mouse &nbsp;|&nbsp; Buy/Steal/Slap: <kbd>SPACE</kbd> or <kbd>E</kbd>
 </div>
 
-<script>
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+<!-- Load Three.js from CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
+<script>
 // Brainrot Tiers
 const BRAINROT_TYPES = [
-  { name: "Skibidi", cost: 25, income: 3, color: "#94a3b8", emoji: "🚽" },
-  { name: "Rizzler", cost: 75, income: 10, color: "#38bdf8", emoji: "😎" },
-  { name: "Sigma", cost: 200, income: 30, color: "#a855f7", emoji: "🗿" },
-  { name: "Grimace", cost: 500, income: 80, color: "#ec4899", emoji: "🥤" },
-  { name: "GigaChad", cost: 1200, income: 220, color: "#f59e0b", emoji: "💪" }
+  { name: "Skibidi", cost: 25, income: 3, color: 0x94a3b8, emoji: "🚽" },
+  { name: "Rizzler", cost: 75, income: 10, color: 0x38bdf8, emoji: "😎" },
+  { name: "Sigma", cost: 200, income: 30, color: 0xa855f7, emoji: "🗿" },
+  { name: "Grimace", cost: 500, income: 80, color: 0xec4899, emoji: "🥤" },
+  { name: "GigaChad", cost: 1200, income: 220, color: 0xf59e0b, emoji: "💪" }
 ];
 
-// Game State
-const keys = {};
+// Scene Setup
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x121218);
+scene.fog = new THREE.FogExp2(0x121218, 0.015);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambientLight);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(10, 20, 10);
+dirLight.castShadow = true;
+scene.add(dirLight);
+
+// Arena Ground
+const floorGeo = new THREE.PlaneGeometry(60, 40);
+const floorMat = new THREE.MeshStandardMaterial({ color: 0x1e1e2d, roughness: 0.8 });
+const floor = new THREE.Mesh(floorGeo, floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// Center Conveyor Belt
+const convGeo = new THREE.BoxGeometry(6, 0.1, 40);
+const convMat = new THREE.MeshStandardMaterial({ color: 0x272738 });
+const conveyor = new THREE.Mesh(convGeo, convMat);
+conveyor.position.set(0, 0.05, 0);
+scene.add(conveyor);
+
+// Bases Definition
+const playerBase = { x: -18, z: 0, w: 10, h: 14, slots: [] };
+const rivalBase = { x: 18, z: 0, w: 10, h: 14, slots: [] };
+
+function createBaseVisual(base, colorHex, label) {
+  const group = new THREE.Group();
+  const baseGeo = new THREE.BoxGeometry(base.w, 0.2, base.h);
+  const baseMat = new THREE.MeshStandardMaterial({ color: colorHex, transparent: true, opacity: 0.3 });
+  const mesh = new THREE.Mesh(baseGeo, baseMat);
+  mesh.position.set(base.x, 0.1, base.z);
+  group.add(mesh);
+
+  // Pedestal slots (6 per base)
+  let idx = 0;
+  for (let r = -1; r <= 1; r++) {
+    for (let c = -0.5; c <= 0.5; c += 1) {
+      const slotX = base.x + c * 3.5;
+      const slotZ = base.z + r * 3.5;
+      
+      const pedGeo = new THREE.CylinderGeometry(1.2, 1.4, 0.4, 16);
+      const pedMat = new THREE.MeshStandardMaterial({ color: 0x33334d });
+      const ped = new THREE.Mesh(pedGeo, pedMat);
+      ped.position.set(slotX, 0.3, slotZ);
+      group.add(ped);
+
+      base.slots.push({ x: slotX, z: slotZ, item: null, mesh: null });
+      idx++;
+    }
+  }
+  scene.add(group);
+}
+createBaseVisual(playerBase, 0x3b82f6, "Your Base");
+createBaseVisual(rivalBase, 0xef4444, "Rival Base");
+
+// Game Entities
+let player = {
+  x: -18, z: 8, radius: 1.2, speed: 0.12,
+  cash: 50, carrying: null, angle: 0
+};
+
+let bot = {
+  x: 18, z: -8, radius: 1.2, speed: 0.08,
+  cash: 50, carrying: null, mesh: null, stunTimer: 0
+};
+
+// Create Bot Mesh
+const botGeo = new THREE.CapsuleGeometry(0.8, 1.5, 4, 8);
+const botMat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
+bot.mesh = new THREE.Mesh(botGeo, botMat);
+bot.mesh.position.set(bot.x, 1.5, bot.z);
+scene.add(bot.mesh);
+
+// Conveyor Items Collection
 let conveyorItems = [];
-let floatingTexts = [];
 let spawnTimer = 0;
 let incomeTimer = 0;
 
-// Base Definitions
-const playerBase = { x: 30, y: 125, w: 220, h: 300, color: "rgba(59, 130, 246, 0.2)", border: "#3b82f6", slots: [] };
-const rivalBase = { x: 650, y: 125, w: 220, h: 300, color: "rgba(239, 68, 68, 0.2)", border: "#ef4444", slots: [] };
+// Input Management
+const keys = {};
+let isMouseDown = false;
+let mouseX = 0, mouseY = 0;
+let cameraYaw = Math.PI / 2;
+let cameraPitch = 0.3;
 
-// Initialize 6 slots per base
-function initSlots(base) {
-  for (let row = 0; row < 3; row++) {
-    for (let col = 0; col < 2; col++) {
-      base.slots.push({
-        x: base.x + 40 + col * 90,
-        y: base.y + 45 + row * 85,
-        item: null
-      });
-    }
-  }
-}
-initSlots(playerBase);
-initSlots(rivalBase);
-
-// Entities
-const player = {
-  x: 140, y: 275, radius: 18, speed: 4.2, color: "#3b82f6",
-  cash: 50, carrying: null, stunTimer: 0, slapCooldown: 0
-};
-
-const bot = {
-  x: 760, y: 275, radius: 18, speed: 3.4, color: "#ef4444",
-  cash: 50, carrying: null, stunTimer: 0, slapCooldown: 0,
-  state: "IDLE", target: null
-};
-
-// Input Listeners
 window.addEventListener('keydown', e => {
   keys[e.code] = true;
   if (e.code === 'Space' || e.code === 'KeyE') {
-    handleAction(player, playerBase, bot, rivalBase);
+    handleAction();
   }
 });
 window.addEventListener('keyup', e => keys[e.code] = false);
 
-function addFloatingText(text, x, y, color = "#fff") {
-  floatingTexts.push({ text, x, y, color, life: 50 });
-}
-
-function getIncome(base) {
-  return base.slots.reduce((sum, slot) => sum + (slot.item ? slot.item.income : 0), 0);
-}
+window.addEventListener('mousedown', () => isMouseDown = true);
+window.addEventListener('mouseup', () => isMouseDown = false);
+window.addEventListener('mousemove', e => {
+  if (isMouseDown) {
+    cameraYaw -= e.movementX * 0.004;
+    cameraPitch -= e.movementY * 0.004;
+    cameraPitch = Math.max(0.1, Math.min(1.4, cameraPitch));
+  }
+});
 
 function getEmptySlot(base) {
   return base.slots.find(s => s.item === null);
 }
 
-// Core Interaction: Slap, Buy, or Steal
-function handleAction(actor, ownBase, enemy, enemyBase) {
-  if (actor.stunTimer > 0) return;
+function getIncome(base) {
+  return base.slots.reduce((sum, s) => sum + (s.item ? s.item.type.income : 0), 0);
+}
 
-  // 1. Slap enemy if close
-  const distToEnemy = Math.hypot(actor.x - enemy.x, actor.y - enemy.y);
-  if (distToEnemy < 55 && actor.slapCooldown <= 0) {
-    actor.slapCooldown = 45;
-    enemy.stunTimer = 90; // 1.5 seconds stun
-    addFloatingText("SLAP! 💥", enemy.x, enemy.y - 25, "#facc15");
-    if (enemy.carrying) {
-      addFloatingText(`DROPPED ${enemy.carrying.name}!`, enemy.x, enemy.y - 45, "#f87171");
-      enemy.carrying = null; // Stolen item vanishes / returns
+// 3D Text Creator Helper using Canvas Texture
+function createBrainrotMesh(type) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  
+  ctx.fillStyle = "#232332";
+  ctx.fillRect(0,0,256,256);
+  ctx.font = "bold 90px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(type.emoji, 128, 100);
+
+  ctx.font = "bold 28px sans-serif";
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(type.name, 128, 195);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const geo = new THREE.BoxGeometry(1.8, 1.8, 1.8);
+  const mat = new THREE.MeshStandardMaterial({ map: texture, color: type.color });
+  const mesh = new THREE.Mesh(geo, mat);
+  return mesh;
+}
+
+// Action Trigger (Buy, Steal, Slap)
+function handleAction() {
+  // 1. Slap Bot if close
+  const distToBot = Math.hypot(player.x - bot.x, player.z - bot.z);
+  if (distToBot < 3.5) {
+    bot.stunTimer = 120;
+    if (bot.carrying) {
+      scene.remove(bot.carrying.mesh);
+      bot.carrying = null;
     }
     return;
   }
 
-  // Cannot pick up if already carrying
-  if (actor.carrying) return;
+  if (player.carrying) return;
 
-  // 2. Try buying from conveyor
+  // 2. Buy from Conveyor Belt
   for (let i = conveyorItems.length - 1; i >= 0; i--) {
     const item = conveyorItems[i];
-    if (Math.hypot(actor.x - item.x, actor.y - item.y) < 45) {
-      if (actor.cash >= item.type.cost) {
-        if (!getEmptySlot(ownBase)) {
-          if (actor === player) addFloatingText("Base Full!", actor.x, actor.y - 25, "#f87171");
-          return;
-        }
-        actor.cash -= item.type.cost;
-        actor.carrying = { ...item.type };
+    const dist = Math.hypot(player.x - item.mesh.position.x, player.z - item.mesh.position.z);
+    if (dist < 2.5) {
+      if (player.cash >= item.type.cost) {
+        const slot = getEmptySlot(playerBase);
+        if (!slot) return;
+
+        player.cash -= item.type.cost;
+        player.carrying = { type: item.type, mesh: createBrainrotMesh(item.type) };
+        scene.add(player.carrying.mesh);
+        scene.remove(item.mesh);
         conveyorItems.splice(i, 1);
-        addFloatingText(`-$${item.type.cost}`, actor.x, actor.y - 25, "#f87171");
         return;
-      } else if (actor === player) {
-        addFloatingText("Not enough cash!", actor.x, actor.y - 25, "#f87171");
       }
     }
   }
 
-  // 3. Try stealing from enemy base
-  for (let slot of enemyBase.slots) {
-    if (slot.item && Math.hypot(actor.x - slot.x, actor.y - slot.y) < 40) {
-      if (!getEmptySlot(ownBase)) {
-        if (actor === player) addFloatingText("Base Full!", actor.x, actor.y - 25, "#f87171");
-        return;
-      }
-      actor.carrying = slot.item;
+  // 3. Steal from Rival Base
+  for (let slot of rivalBase.slots) {
+    if (slot.item && Math.hypot(player.x - slot.x, player.z - slot.z) < 2.5) {
+      const pSlot = getEmptySlot(playerBase);
+      if (!pSlot) return;
+
+      player.carrying = slot.item;
       slot.item = null;
-      addFloatingText("STOLEN! 🚨", actor.x, actor.y - 30, "#c084fc");
       return;
     }
   }
@@ -203,292 +289,157 @@ function handleAction(actor, ownBase, enemy, enemyBase) {
 function updateBot() {
   if (bot.stunTimer > 0) {
     bot.stunTimer--;
+    bot.mesh.material.color.setHex(0x64748b);
     return;
   }
-  if (bot.slapCooldown > 0) bot.slapCooldown--;
+  bot.mesh.material.color.setHex(0xef4444);
 
-  // Defend base if player is inside rivalBase
-  const playerInRivalBase = player.x > rivalBase.x && player.x < rivalBase.x + rivalBase.w &&
-                            player.y > rivalBase.y && player.y < rivalBase.y + rivalBase.h;
-
+  // Target assignment
   let targetX = bot.x;
-  let targetY = bot.y;
+  let targetZ = bot.z;
 
   if (bot.carrying) {
-    // Return to own base
-    targetX = rivalBase.x + rivalBase.w / 2;
-    targetY = rivalBase.y + rivalBase.h / 2;
-  } else if (playerInRivalBase) {
-    // Chase player to slap them!
-    targetX = player.x;
-    targetY = player.y;
-    if (Math.hypot(bot.x - player.x, bot.y - player.y) < 50) {
-      handleAction(bot, rivalBase, player, playerBase);
-    }
+    targetX = rivalBase.x;
+    targetZ = rivalBase.z;
   } else {
-    // Decide whether to buy from conveyor or steal from player
+    // Find affordable conveyor item
     const affordable = conveyorItems.filter(i => bot.cash >= i.type.cost);
-    const stealable = playerBase.slots.filter(s => s.item !== null);
-
     if (affordable.length > 0 && getEmptySlot(rivalBase)) {
-      // Go to highest tier affordable item
-      affordable.sort((a, b) => b.type.cost - a.type.cost);
-      targetX = affordable[0].x;
-      targetY = affordable[0].y;
-      if (Math.hypot(bot.x - targetX, bot.y - targetY) < 35) {
-        handleAction(bot, rivalBase, player, playerBase);
-      }
-    } else if (stealable.length > 0 && getEmptySlot(rivalBase) && Math.random() < 0.02) {
-      bot.stealTarget = stealable[0];
-    }
+      targetX = affordable[0].mesh.position.x;
+      targetZ = affordable[0].mesh.position.z;
 
-    if (bot.stealTarget && bot.stealTarget.item && !bot.carrying) {
-      targetX = bot.stealTarget.x;
-      targetY = bot.stealTarget.y;
-      if (Math.hypot(bot.x - targetX, bot.y - targetY) < 35) {
-        handleAction(bot, rivalBase, player, playerBase);
-        bot.stealTarget = null;
+      // Buy if close
+      if (Math.hypot(bot.x - targetX, bot.z - targetZ) < 2) {
+        const item = affordable[0];
+        const idx = conveyorItems.indexOf(item);
+        if (idx !== -1) {
+          bot.cash -= item.type.cost;
+          bot.carrying = { type: item.type, mesh: createBrainrotMesh(item.type) };
+          scene.add(bot.carrying.mesh);
+          scene.remove(item.mesh);
+          conveyorItems.splice(idx, 1);
+        }
       }
     }
   }
 
-  // Move Bot
+  // Move bot toward target
   const dx = targetX - bot.x;
-  const dy = targetY - bot.y;
-  const dist = Math.hypot(dx, dy);
-  if (dist > 4) {
+  const dz = targetZ - bot.z;
+  const dist = Math.hypot(dx, dz);
+  if (dist > 0.5) {
     bot.x += (dx / dist) * bot.speed;
-    bot.y += (dy / dist) * bot.speed;
+    bot.z += (dz / dist) * bot.speed;
   }
+  bot.mesh.position.set(bot.x, 1.2, bot.z);
 
-  // Deposit if in own base
-  if (bot.carrying && bot.x > rivalBase.x && bot.x < rivalBase.x + rivalBase.w &&
-      bot.y > rivalBase.y && bot.y < rivalBase.y + rivalBase.h) {
+  // Bot deposit
+  if (bot.carrying && Math.hypot(bot.x - rivalBase.x, bot.z - rivalBase.z) < 3.5) {
     const slot = getEmptySlot(rivalBase);
     if (slot) {
       slot.item = bot.carrying;
-      addFloatingText(`+${bot.carrying.name}`, slot.x, slot.y - 20, "#4ade80");
+      slot.item.mesh.position.set(slot.x, 1.2, slot.z);
+      scene.add(slot.item.mesh);
       bot.carrying = null;
     }
   }
 }
 
-// Main Update Loop
-function update() {
-  // Spawn conveyor items
+// Main Loop
+function animate() {
+  requestAnimationFrame(animate);
+
+  // 1. Spawn Conveyor items
   spawnTimer++;
-  if (spawnTimer >= 110) {
+  if (spawnTimer >= 120) {
     spawnTimer = 0;
     const rand = Math.random();
-    let tier = 0;
-    if (rand > 0.92) tier = 4;
-    else if (rand > 0.80) tier = 3;
-    else if (rand > 0.60) tier = 2;
-    else if (rand > 0.35) tier = 1;
-
-    conveyorItems.push({
-      x: 450,
-      y: -25,
-      type: BRAINROT_TYPES[tier]
-    });
+    let tier = rand > 0.9 ? 4 : (rand > 0.7 ? 3 : (rand > 0.4 ? 2 : (rand > 0.2 ? 1 : 0)));
+    const type = BRAINROT_TYPES[tier];
+    
+    const mesh = createBrainrotMesh(type);
+    mesh.position.set(0, 1, -18);
+    scene.add(mesh);
+    conveyorItems.push({ type, mesh });
   }
 
-  // Move conveyor items
+  // Move conveyor items forward
   for (let i = conveyorItems.length - 1; i >= 0; i--) {
-    conveyorItems[i].y += 1.5;
-    if (conveyorItems[i].y > canvas.height + 30) {
+    conveyorItems[i].mesh.position.z += 0.06;
+    if (conveyorItems[i].mesh.position.z > 18) {
+      scene.remove(conveyorItems[i].mesh);
       conveyorItems.splice(i, 1);
     }
   }
 
-  // Passive Income (every 60 frames = 1 sec)
+  // 2. Passive Income Tick (every 60 frames = 1s)
   incomeTimer++;
   if (incomeTimer >= 60) {
     incomeTimer = 0;
-    const pInc = getIncome(playerBase);
-    const rInc = getIncome(rivalBase);
-    player.cash += pInc;
-    bot.cash += rInc;
-
-    if (pInc > 0) addFloatingText(`+$${pInc}`, playerBase.x + 110, playerBase.y - 10, "#4ade80");
-    if (rInc > 0) addFloatingText(`+$${rInc}`, rivalBase.x + 110, rivalBase.y - 10, "#4ade80");
+    player.cash += getIncome(playerBase);
+    bot.cash += getIncome(rivalBase);
   }
 
-  // Player Movement
-  if (player.stunTimer > 0) {
-    player.stunTimer--;
-  } else {
-    let moveX = 0, moveY = 0;
-    if (keys['KeyW'] || keys['ArrowUp']) moveY -= 1;
-    if (keys['KeyS'] || keys['ArrowDown']) moveY += 1;
-    if (keys['KeyA'] || keys['ArrowLeft']) moveX -= 1;
-    if (keys['KeyD'] || keys['ArrowRight']) moveX += 1;
+  // 3. Player Movement relative to camera angle
+  let moveX = 0, moveZ = 0;
+  if (keys['KeyW'] || keys['ArrowUp']) moveZ -= 1;
+  if (keys['KeyS'] || keys['ArrowDown']) moveZ += 1;
+  if (keys['KeyA'] || keys['ArrowLeft']) moveX -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) moveX += 1;
 
-    if (moveX !== 0 || moveY !== 0) {
-      const len = Math.hypot(moveX, moveY);
-      const currentSpeed = player.carrying ? player.speed * 0.85 : player.speed; // Slightly slower when carrying
-      player.x += (moveX / len) * currentSpeed;
-      player.y += (moveY / len) * currentSpeed;
-    }
+  if (moveX !== 0 || moveZ !== 0) {
+    const angle = Math.atan2(moveX, moveZ) + cameraYaw;
+    player.x += Math.sin(angle) * player.speed;
+    player.z += Math.cos(angle) * player.speed;
   }
-  if (player.slapCooldown > 0) player.slapCooldown--;
 
-  // Clamp player to arena
-  player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
-  player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
+  // Arena bounds check
+  player.x = Math.max(-28, Math.min(28, player.x));
+  player.z = Math.max(-18, Math.min(18, player.z));
 
-  // Deposit carried item into player base
-  if (player.carrying && player.x > playerBase.x && player.x < playerBase.x + playerBase.w &&
-      player.y > playerBase.y && player.y < playerBase.y + playerBase.h) {
+  // Player Deposit
+  if (player.carrying && Math.hypot(player.x - playerBase.x, player.z - playerBase.z) < 4) {
     const slot = getEmptySlot(playerBase);
     if (slot) {
       slot.item = player.carrying;
-      addFloatingText(`Secured ${player.carrying.name}!`, slot.x, slot.y - 20, "#4ade80");
+      slot.item.mesh.position.set(slot.x, 1.2, slot.z);
+      scene.add(slot.item.mesh);
       player.carrying = null;
     }
   }
 
-  updateBot();
-
-  // Update floating texts
-  for (let i = floatingTexts.length - 1; i >= 0; i--) {
-    floatingTexts[i].y -= 0.8;
-    floatingTexts[i].life--;
-    if (floatingTexts[i].life <= 0) floatingTexts.splice(i, 1);
+  // Position carried item above player
+  if (player.carrying) {
+    player.carrying.mesh.position.set(player.x, 3.2, player.z);
+    player.carrying.mesh.rotation.y += 0.03;
   }
 
-  // Update UI
+  updateBot();
+
+  // 4. Camera Follows Player smoothly
+  const camDist = 10;
+  camera.position.x = player.x + Math.sin(cameraYaw) * Math.cos(cameraPitch) * camDist;
+  camera.position.y = Math.sin(cameraPitch) * camDist + 1;
+  camera.position.z = player.z + Math.cos(cameraYaw) * Math.cos(cameraPitch) * camDist;
+  camera.lookAt(player.x, player.y + 1.2, player.z);
+
+  // 5. Update UI
   document.getElementById('player-cash').textContent = `$${player.cash}`;
   document.getElementById('player-income').textContent = `(+$${getIncome(playerBase)}/s)`;
   document.getElementById('rival-cash').textContent = `Bot: $${bot.cash}`;
   document.getElementById('rival-income').textContent = `(+$${getIncome(rivalBase)}/s)`;
+
+  renderer.render(scene, camera);
 }
 
-// Render Loop
-function drawBase(base, label) {
-  ctx.fillStyle = base.color;
-  ctx.strokeStyle = base.border;
-  ctx.lineWidth = 3;
-  ctx.fillRect(base.x, base.y, base.w, base.h);
-  ctx.strokeRect(base.x, base.y, base.w, base.h);
+animate();
 
-  ctx.fillStyle = base.border;
-  ctx.font = "bold 14px sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText(label, base.x + base.w / 2, base.y - 10);
-
-  // Draw Slots
-  for (let slot of base.slots) {
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
-    ctx.beginPath();
-    ctx.arc(slot.x, slot.y, 26, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.15)";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    if (slot.item) {
-      drawBrainrot(slot.x, slot.y, slot.item, false);
-    }
-  }
-}
-
-function drawBrainrot(x, y, type, showCost) {
-  ctx.fillStyle = type.color;
-  ctx.beginPath();
-  ctx.arc(x, y, 20, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.font = "20px sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(type.emoji, x, y);
-
-  ctx.font = "bold 11px sans-serif";
-  ctx.fillStyle = "#fff";
-  ctx.fillText(type.name, x, y + 28);
-
-  if (showCost) {
-    ctx.fillStyle = "#4ade80";
-    ctx.fillText(`$${type.cost}`, x, y - 28);
-  } else {
-    ctx.fillStyle = "#facc15";
-    ctx.fillText(`+$${type.income}/s`, x, y - 28);
-  }
-}
-
-function drawEntity(ent, label) {
-  // Body
-  ctx.fillStyle = ent.stunTimer > 0 ? "#64748b" : ent.color;
-  ctx.beginPath();
-  ctx.arc(ent.x, ent.y, ent.radius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#fff";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Name / Stun status
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 12px sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText(ent.stunTimer > 0 ? "STUNNED!" : label, ent.x, ent.y - 26);
-
-  // Carried Brainrot overhead
-  if (ent.carrying) {
-    ctx.font = "22px sans-serif";
-    ctx.fillText(ent.carrying.emoji, ent.x, ent.y - 45);
-  }
-}
-
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Conveyor Belt
-  ctx.fillStyle = "#181822";
-  ctx.fillRect(405, 0, 90, canvas.height);
-  ctx.strokeStyle = "#3f3f5a";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(405, 0, 90, canvas.height);
-
-  // Conveyor Stripes
-  ctx.strokeStyle = "#2b2b3d";
-  const offset = (Date.now() / 15) % 40;
-  for (let y = offset - 40; y < canvas.height; y += 40) {
-    ctx.beginPath();
-    ctx.moveTo(410, y);
-    ctx.lineTo(490, y + 15);
-    ctx.stroke();
-  }
-
-  // Bases
-  drawBase(playerBase, "YOUR BASE (DROP OFF)");
-  drawBase(rivalBase, "RIVAL BASE (STEAL HERE)");
-
-  // Conveyor Items
-  for (let item of conveyorItems) {
-    drawBrainrot(item.x, item.y, item.type, true);
-  }
-
-  // Player & Bot
-  drawEntity(bot, "RIVAL BOT");
-  drawEntity(player, "YOU");
-
-  // Floating Texts
-  for (let ft of floatingTexts) {
-    ctx.fillStyle = ft.color;
-    ctx.font = "bold 14px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(ft.text, ft.x, ft.y);
-  }
-}
-
-function gameLoop() {
-  update();
-  draw();
-  requestAnimationFrame(gameLoop);
-}
-
-gameLoop();
+// Resize Handler
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
 </script>
 </body>
 </html>
